@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Szerver Nélküli Kvíz</title>
+    <title>Kvíz kitöltő</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: Arial; text-align: center; margin: 0; padding: 15px; background: #f0f2f5; user-select: none; }
@@ -30,13 +30,10 @@
     <div id="name-screen" class="hidden">
         <h2>Add meg a neved!</h2>
         <input type="text" id="player-name" placeholder="Neved" style="width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #ccc; box-sizing:border-box;">
-       <p> Csak akkor indítsd a játékot, ha erre utasítást kapsz! (Egyszerre kezdjük el! Az óra akkor fog induln.- </p>
         <button class="setup-btn" style="background:#4CAF50;" onclick="initQuiz()">Játék indítása</button>
     </div>
     <div id="quiz-screen" class="hidden">
-        <div style="display:flex; justify-content:space-between; font-weight:bold;">
-            <span id="question-counter">1. Kérdés</span><span id="live-score">0 pont</span>
-        </div>
+        <div style="display:flex; justify-content:space-between; font-weight:bold;"><span id="question-counter">1. Kérdés</span><span id="live-score">0 pont</span></div>
         <div id="timer-bar"><div id="timer-progress"></div></div>
         <div id="multiple-choice-ui" class="btn-grid">
             <button class="answer-btn btn-A" onclick="submitAnswer('A')">A</button><button class="answer-btn btn-B" onclick="submitAnswer('B')">B</button>
@@ -59,102 +56,18 @@
     </div>
 </div>
 <script>
-    let correctAnswers=[], playerAnswers=[], currentQuestionIndex=0, correctCount=0, totalTimeSpent=0, timeLeft=60, timerInterval, html5QrCode;
-    const TIME_LIMIT = 60;
-    
-    function startCamera() {
-        if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, ()=>{})
-        .catch(() => document.getElementById('qr-status').innerText = "Kamera hiba. HTTPS oldalt használsz?");
-    }
-    function onScanSuccess(text) {
-        if(text.trim().length > 0) {
-            correctAnswers = text.trim().split(',').map(i => i.trim().toUpperCase());
-            if (html5QrCode?.isScanning) {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('reader').innerHTML = "";
-                    document.getElementById('qr-screen').classList.add('hidden');
-                    document.getElementById('name-screen').classList.remove('hidden');
-                });
-            }
-        }
-    }
-    function initQuiz() {
-        if(!document.getElementById('player-name').value.trim()) { alert("Adj meg egy nevet!"); return; }
-        document.getElementById('name-screen').classList.add('hidden');
-        document.getElementById('quiz-screen').classList.remove('hidden');
-        startQuestion();
-    }
-    function startQuestion() {
-        timeLeft = TIME_LIMIT;
-        document.getElementById('question-counter').innerText = `${currentQuestionIndex + 1}. Kérdés`;
-        document.getElementById('status-text').innerText = `Kérdések: ${currentQuestionIndex + 1} / ${correctAnswers.length}`;
-        document.getElementById('open-answer-field').value = "";
-        let cur = correctAnswers[currentQuestionIndex];
-        let isMC = ["A", "B", "C", "D"].includes(cur);
-        document.getElementById('multiple-choice-ui').classList.toggle('hidden', !isMC);
-        document.getElementById('open-question-ui').classList.toggle('hidden', isMC);
-        if(!isMC) setTimeout(() => document.getElementById('open-answer-field').focus(), 50);
-        clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            timeLeft -= 0.1;
-            document.getElementById('timer-progress').style.width = `${(timeLeft / TIME_LIMIT) * 100}%`;
-            if (timeLeft <= 0) { clearInterval(timerInterval); playerAnswers.push("IDŐ LEJÁRT"); processAnswer(false, TIME_LIMIT); }
-        }, 100);
-    }
-    function submitAnswer(letter) { 
-        clearInterval(timerInterval); playerAnswers.push(letter);
-        processAnswer(letter === correctAnswers[currentQuestionIndex], parseFloat((TIME_LIMIT - timeLeft).toFixed(1))); 
-    }
-    function submitOpenAnswer() {
-        let ans = document.getElementById('open-answer-field').value.trim().toUpperCase();
-        if(!ans) { alert("Írj be valamit!"); return; }
-        clearInterval(timerInterval); playerAnswers.push(ans);
-        processAnswer(checkMatch(ans, correctAnswers[currentQuestionIndex]), parseFloat((TIME_LIMIT - timeLeft).toFixed(1)));
-    }
-    
-    function cleanStr(s) {
-        return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "");
-    }
-    function checkMatch(a, b) {
-        let ca = cleanStr(a), cb = cleanStr(b);
-        if (ca === cb) return true;
-        if (cb.length < 4) return false;
-        let dp = Array.from({length:ca.length+1},()=>Array(cb.length+1).fill(0));
-        for(let i=0;i<=ca.length;i++) dp[i][0]=i; for(let j=0;j<=cb.length;j++) dp[0][j]=j;
-        for(let i=1;i<=ca.length;i++){
-            for(let j=1;j<=cb.length;j++){
-                dp[i][j] = ca[i-1]===cb[j-1] ? dp[i-1][j-1] : Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+1);
-            }
-        }
-        return dp[ca.length][cb.length] <= 1;
-    }
-
-    function processAnswer(isCorrect, time) {
-        totalTimeSpent += time;
-        if (isCorrect) { correctCount++; document.getElementById('live-score').innerText = `${correctCount} pont`; }
-        currentQuestionIndex++;
-        if (currentQuestionIndex < correctAnswers.length) startQuestion(); else showResults();
-    }
-    function showResults() {
-        document.getElementById('quiz-screen').classList.add('hidden');
-        document.getElementById('result-screen').classList.remove('hidden');
-        let name = document.getElementById('player-name').value.trim();
-        document.getElementById('score-text').innerText = `${correctCount} / ${correctAnswers.length} pont`;
-        document.getElementById('total-time-text').innerText = `Idő: ${totalTimeSpent.toFixed(1)} mp`;
-        document.getElementById('stats-text').innerText = `Játékos: ${name}\nArány: ${Math.round((correctCount / correctAnswers.length) * 100)}%\nÁtlagidő: ${(totalTimeSpent / correctAnswers.length).toFixed(1)} mp/kérdés`;
-        let listContainer = document.getElementById('answers-list'); listContainer.innerHTML = "";
-        correctAnswers.forEach((correct, idx) => {
-            let playerAns = playerAnswers[idx], p = document.createElement('div'), isCorrect = (playerAns===correct || (["A","B","C","D"].includes(correct)?false:checkMatch(playerAns,correct)));
-            if(isCorrect) { p.className="correct-line"; p.innerText=`✔️ ${idx+1}. kérdés: Helyes! Válaszod: "${playerAns}"`;
- }
-else { p.className="wrong-line";
- p.innerText=❌ ${idx+1}. kérdés: Hibás! Te: "${playerAns}", Helyes: "${correct}"; 
-}listContainer.appendChild(p);});}
-function toggleAnswers() { document.getElementById('answers-list').classList.toggle('hidden'); }
-
-
+    let correctAnswers=[], playerAnswers=[], currentQuestionIndex=0, correctCount=0, totalTimeSpent=0, timeLeft=60, timerInterval, html5QrCode; const TIME_LIMIT = 60;
+    function startCamera() { if (!html5QrCode) html5QrCode = new Html5Qrcode("reader"); html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, ()=>{}).catch(() => document.getElementById('qr-status').innerText = "Kamera hiba. HTTPS?"); }
+    function onScanSuccess(text) { if(text.trim().length > 0) { correctAnswers = text.trim().split(',').map(i => i.trim().toUpperCase()); if (html5QrCode?.isScanning) { html5QrCode.stop().then(() => { document.getElementById('reader').innerHTML = ""; document.getElementById('qr-screen').classList.add('hidden'); document.getElementById('name-screen').classList.remove('hidden'); }); } } }
+    function initQuiz() { if(!document.getElementById('player-name').value.trim()) { alert("Adj meg egy nevet!"); return; } document.getElementById('name-screen').classList.add('hidden'); document.getElementById('quiz-screen').classList.remove('hidden'); startQuestion(); }
+    function startQuestion() { timeLeft = TIME_LIMIT; document.getElementById('question-counter').innerText = `${currentQuestionIndex + 1}. Kérdés`; document.getElementById('status-text').innerText = `Kérdések: ${currentQuestionIndex + 1} / ${correctAnswers.length}`; document.getElementById('open-answer-field').value = ""; let cur = correctAnswers[currentQuestionIndex]; let isMC = ["A", "B", "C", "D"].includes(cur); document.getElementById('multiple-choice-ui').classList.toggle('hidden', !isMC); document.getElementById('open-question-ui').classList.toggle('hidden', isMC); if(!isMC) setTimeout(() => document.getElementById('open-answer-field').focus(), 50); clearInterval(timerInterval); timerInterval = setInterval(() => { timeLeft -= 0.1; if (timeLeft < 0) timeLeft = 0; document.getElementById('timer-progress').style.width = `${(timeLeft / TIME_LIMIT) * 100}%`; if (timeLeft <= 0) { clearInterval(timerInterval); playerAnswers.push("IDŐ LEJÁRT"); processAnswer(false, TIME_LIMIT); } }, 100); }
+    function submitAnswer(letter) { clearInterval(timerInterval); playerAnswers.push(letter); processAnswer(letter === correctAnswers[currentQuestionIndex], parseFloat((TIME_LIMIT - timeLeft).toFixed(1))); }
+    function submitOpenAnswer() { let ans = document.getElementById('open-answer-field').value.trim().toUpperCase(); if(!ans) { alert("Írj be valamit!"); return; } clearInterval(timerInterval); playerAnswers.push(ans); processAnswer(checkMatch(ans, correctAnswers[currentQuestionIndex]), parseFloat((TIME_LIMIT - timeLeft).toFixed(1))); }
+    function processAnswer(isCorrect, timeTaken) { if(isCorrect) { correctCount++; document.getElementById('live-score').innerText = `${correctCount} pont`; } totalTimeSpent += timeTaken; currentQuestionIndex++; if(currentQuestionIndex < correctAnswers.length) { startQuestion(); } else { showResults(); } }
+    function showResults() { document.getElementById('quiz-screen').classList.add('hidden'); document.getElementById('result-screen').classList.remove('hidden'); document.getElementById('score-text').innerText = `${correctCount} / ${correctAnswers.length} pont`; document.getElementById('total-time-text').innerText = `${totalTimeSpent.toFixed(1)} másodperc`; let pName = document.getElementById('player-name').value.trim(); document.getElementById('stats-text').innerText = `Játékos: ${pName}\nHelyes válaszok aránya: ${((correctCount/correctAnswers.length)*100).toFixed(0)}%`; let listHtml = ""; for(let i=0; i<correctAnswers.length; i++) { let isCorrect = checkMatch(playerAnswers[i], correctAnswers[i]) || playerAnswers[i] === correctAnswers[i]; listHtml += `<div class="${isCorrect ? 'correct-line' : 'wrong-line'}">${i+1}. Kérdés: Te: ${playerAnswers[i]} | Helyes: ${correctAnswers[i]}</div>`; } document.getElementById('answers-list').innerHTML = listHtml; }
+    function toggleAnswers() { document.getElementById('answers-list').classList.toggle('hidden'); }
+    function cleanStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "") : ""; }
+    function checkMatch(a, b) { let ca = cleanStr(a), cb = cleanStr(b); if (ca === cb) return true; if (cb.length < 4) return false; let dp = Array.from({length:ca.length+1},()=>Array(cb.length+1).fill(0)); for(let i=0;i<=ca.length;i++) dp[i][0]=i; for(let j=0;j<=cb.length;j++) dp[0][j]=j; for(let i=1;i<=ca.length;i++) { for(let j=1;j<=cb.length;j++) { dp[i][j] = ca[i-1] === cb[j-1] ? dp[i-1][j-1] : Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) + 1; } } return dp[ca.length][cb.length] <= 1; }
 </script>
 </body>
 </html>
-
