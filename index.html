@@ -51,6 +51,10 @@
         <div style="font-size:32px; font-weight:bold; color:#4CAF50; margin:10px 0;" id="score-text">0 pont</div>
         <div style="font-size:18px; font-weight:bold; color:#555; margin-bottom:20px;" id="total-time-text">0.0 mp</div>
         <p id="stats-text" style="white-space:pre-line; text-align:left; background:#eee; padding:15px; border-radius:8px;"></p>
+
+        <button class="setup-btn" style="background:#673AB7;" onclick="toggleAnswers()">Megoldókulcs megtekintése</button>
+        <p id="answers-list" class="hidden" style="white-space:pre-line; text-align:left; background:#fff; border:1px solid #ccc; padding:15px; border-radius:8px; margin-top:10px; font-weight:bold;"></p>
+  
         <button class="setup-btn" onclick="location.reload()">Új játék</button>
     </div>
 </div>
@@ -122,6 +126,15 @@
         document.getElementById('score-text').innerText = `${correctCount} / ${correctAnswers.length} pont`;
         document.getElementById('total-time-text').innerText = `Idő: ${totalTimeSpent.toFixed(1)} mp`;
         document.getElementById('stats-text').innerText = `Játékos: ${name}\nArány: ${Math.round((correctCount / correctAnswers.length) * 100)}%\nÁtlagidő: ${(totalTimeSpent / correctAnswers.length).toFixed(1)} mp/kérdés`;
+       
+ // Előre legyártjuk a megoldásokat tartalmazó listát
+        let listText = correctAnswers.map((ans, idx) => `${idx + 1}. kérdés helyes válasza: ${ans}`).join('\n');
+        document.getElementById('answers-list').innerText = listText;
+    }
+    function toggleAnswers() {
+        let list = document.getElementById('answers-list');
+        list.classList.toggle('hidden');
+
     }
 </script>
 </body>
