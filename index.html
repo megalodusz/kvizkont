@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Szerver Nélküli Kvíz</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: Arial; text-align: center; margin: 0; padding: 15px; background: #f0f2f5; user-select: none; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); box-sizing: border-box; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .answer-btn { padding: 40px 10px; font-size: 26px; font-weight: bold; color: white; border: none; border-radius: 10px; cursor: pointer; }
+        .btn-A { background: #e21b3c; box-shadow: 0 4px #b0102a; } .btn-B { background: #1368ce; box-shadow: 0 4px #0d4b97; }
+        .btn-C { background: #d89e00; box-shadow: 0 4px #a07500; } .btn-D { background: #26890c; box-shadow: 0 4px #1a6008; }
+        .open-input { width: 100%; padding: 15px; font-size: 20px; font-weight: bold; text-align: center; border-radius: 10px; border: 2px solid #ccc; box-sizing: border-box; margin-bottom: 15px; }
+        .hidden { display: none; }
+        .setup-btn { width: 100%; padding: 15px; margin-top: 15px; font-size: 18px; font-weight: bold; color: white; background: #008CBA; border: none; border-radius: 8px; cursor: pointer; }
+        #reader { width: 100%; margin: 15px auto; background: #fafafa; border-radius: 8px; border: 2px dashed #bbb; min-height: 250px; }
+        #timer-bar { width: 100%; background: #ddd; height: 12px; border-radius: 6px; margin-top: 15px; overflow: hidden; }
+        #timer-progress { width: 100%; height: 100%; background: #ff9800; transition: width 0.1s linear; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="qr-screen">
+        <h2>Szkenneld be a megoldókulcsot!</h2>
+        <button class="setup-btn" style="background:#4CAF50;" onclick="startCamera()">Kamera Indítása</button>
+        <div id="reader"></div><p id="qr-status" style="font-weight:bold;color:#e21b3c;"></p>
+    </div>
+    <div id="name-screen" class="hidden">
+        <h2>Add meg a neved!</h2>
+        <input type="text" id="player-name" placeholder="Neved" style="width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #ccc; box-sizing:border-box;">
+        <button class="setup-btn" style="background:#4CAF50;" onclick="initQuiz()">Csatlakozás</button>
+    </div>
+    <div id="quiz-screen" class="hidden">
+        <div style="display:flex; justify-content:space-between; font-weight:bold;">
+            <span id="question-counter">1. Kérdés</span><span id="live-score">0 pont</span>
+        </div>
+        <div id="timer-bar"><div id="timer-progress"></div></div>
+        <div id="multiple-choice-ui" class="btn-grid">
+            <button class="answer-btn btn-A" onclick="submitAnswer('A')">A</button><button class="answer-btn btn-B" onclick="submitAnswer('B')">B</button>
+            <button class="answer-btn btn-C" onclick="submitAnswer('C')">C</button><button class="answer-btn btn-D" onclick="submitAnswer('D')">D</button>
+        </div>
+        <div id="open-question-ui" class="hidden" style="margin-top:20px;">
+            <input type="text" id="open-answer-field" class="open-input" placeholder="Írd ide a választ..." onkeydown="if(event.key==='Enter') submitOpenAnswer()">
+            <button class="setup-btn" style="background:#ff9800;" onclick="submitOpenAnswer()">Válasz küldése</button>
+        </div>
+        <div class="status" id="status-text" style="margin-top:15px; font-weight:bold; color:#555;"></div>
+    </div>
+    <div id="result-screen" class="hidden">
+        <h2>Szép volt! 🎉</h2>
+        <div style="font-size:32px; font-weight:bold; color:#4CAF50; margin:10px 0;" id="score-text">0 pont</div>
+        <div style="font-size:18px; font-weight:bold; color:#555; margin-bottom:20px;" id="total-time-text">0.0 mp</div>
+        <p id="stats-text" style="white-space:pre-line; text-align:left; background:#eee; padding:15px; border-radius:8px;"></p>
+        <button class="setup-btn" onclick="location.reload()">Új játék</button>
+    </div>
+</div>
+<script>
+    let correctAnswers=[], currentQuestionIndex=0, correctCount=0, totalTimeSpent=0, timeLeft=60, timerInterval, html5QrCode;
+    const TIME_LIMIT = 60;
+    function startCamera() {
+        if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, ()=>{})
+        .catch(() => document.getElementById('qr-status').innerText = "Kamera hiba. HTTPS oldalt használsz?");
+    }
+    function onScanSuccess(text) {
+        if(text.trim().length > 0) {
+            correctAnswers = text.trim().split(',').map(i => i.trim().toUpperCase());
+            if (html5QrCode?.isScanning) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('reader').innerHTML = "";
+                    document.getElementById('qr-screen').classList.add('hidden');
+                    document.getElementById('name-screen').classList.remove('hidden');
+                });
+            }
+        }
+    }
+    function initQuiz() {
+        if(!document.getElementById('player-name').value.trim()) { alert("Adj meg egy nevet!"); return; }
+        document.getElementById('name-screen').classList.add('hidden');
+        document.getElementById('quiz-screen').classList.remove('hidden');
+        startQuestion();
+    }
+    function startQuestion() {
+        timeLeft = TIME_LIMIT;
+        document.getElementById('question-counter').innerText = `${currentQuestionIndex + 1}. Kérdés`;
+        document.getElementById('status-text').innerText = `Kérdések: ${currentQuestionIndex + 1} / ${correctAnswers.length}`;
+        document.getElementById('open-answer-field').value = "";
+        let cur = correctAnswers[currentQuestionIndex];
+        let isMC = ["A", "B", "C", "D"].includes(cur);
+        document.getElementById('multiple-choice-ui').classList.toggle('hidden', !isMC);
+        document.getElementById('open-question-ui').classList.toggle('hidden', isMC);
+        if(!isMC) setTimeout(() => document.getElementById('open-answer-field').focus(), 50);
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft -= 0.1;
+            document.getElementById('timer-progress').style.width = `${(timeLeft / TIME_LIMIT) * 100}%`;
+            if (timeLeft <= 0) { clearInterval(timerInterval); processAnswer(false, TIME_LIMIT); }
+        }, 100);
+    }
+    function submitAnswer(letter) { 
+        clearInterval(timerInterval); 
+        let spent = parseFloat((TIME_LIMIT - timeLeft).toFixed(1));
+        processAnswer(letter === correctAnswers[currentQuestionIndex], spent); 
+    }
+    function submitOpenAnswer() {
+        let ans = document.getElementById('open-answer-field').value.trim().toUpperCase();
+        if(!ans) { alert("Írj be valamit!"); return; }
+        clearInterval(timerInterval);
+        let spent = parseFloat((TIME_LIMIT - timeLeft).toFixed(1));
+        processAnswer(ans === correctAnswers[currentQuestionIndex], spent);
+    }
+    function processAnswer(isCorrect, time) {
+        totalTimeSpent += time;
+        if (isCorrect) { correctCount++; document.getElementById('live-score').innerText = `${correctCount} pont`; }
+        currentQuestionIndex++;
+        if (currentQuestionIndex < correctAnswers.length) startQuestion(); else showResults();
+    }
+    function showResults() {
+        document.getElementById('quiz-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.remove('hidden');
+        let name = document.getElementById('player-name').value.trim();
+        document.getElementById('score-text').innerText = `${correctCount} / ${correctAnswers.length} pont`;
+        document.getElementById('total-time-text').innerText = `Idő: ${totalTimeSpent.toFixed(1)} mp`;
+        document.getElementById('stats-text').innerText = `Játékos: ${name}\nArány: ${Math.round((correctCount / correctAnswers.length) * 100)}%\nÁtlagidő: ${(totalTimeSpent / correctAnswers.length).toFixed(1)} mp/kérdés`;
+    }
+</script>
+</body>
+</html>
