@@ -17,19 +17,20 @@
         #reader { width: 100%; margin: 15px auto; background: #fafafa; border-radius: 8px; border: 2px dashed #bbb; min-height: 250px; }
         #timer-bar { width: 100%; background: #ddd; height: 12px; border-radius: 6px; margin-top: 15px; overflow: hidden; }
         #timer-progress { width: 100%; height: 100%; background: #ff9800; transition: width 0.1s linear; }
+        .correct-line { color: #26890c; margin: 5px 0; } .wrong-line { color: #e21b3c; margin: 5px 0; }
     </style>
 </head>
 <body>
 <div class="container">
     <div id="qr-screen">
-        <h2>Szkenneld be a megoldókulcsot!</h2>
+        <h2>Szkenneld be a QR kódot!</h2>
         <button class="setup-btn" style="background:#4CAF50;" onclick="startCamera()">Kamera Indítása</button>
         <div id="reader"></div><p id="qr-status" style="font-weight:bold;color:#e21b3c;"></p>
     </div>
     <div id="name-screen" class="hidden">
         <h2>Add meg a neved!</h2>
         <input type="text" id="player-name" placeholder="Neved" style="width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #ccc; box-sizing:border-box;">
-        <button class="setup-btn" style="background:#4CAF50;" onclick="initQuiz()">Csatlakozás</button>
+        <button class="setup-btn" style="background:#4CAF50;" onclick="initQuiz()">Játék indítása</button>
     </div>
     <div id="quiz-screen" class="hidden">
         <div style="display:flex; justify-content:space-between; font-weight:bold;">
@@ -51,16 +52,15 @@
         <div style="font-size:32px; font-weight:bold; color:#4CAF50; margin:10px 0;" id="score-text">0 pont</div>
         <div style="font-size:18px; font-weight:bold; color:#555; margin-bottom:20px;" id="total-time-text">0.0 mp</div>
         <p id="stats-text" style="white-space:pre-line; text-align:left; background:#eee; padding:15px; border-radius:8px;"></p>
-
-        <button class="setup-btn" style="background:#673AB7;" onclick="toggleAnswers()">Megoldókulcs megtekintése</button>
-        <p id="answers-list" class="hidden" style="white-space:pre-line; text-align:left; background:#fff; border:1px solid #ccc; padding:15px; border-radius:8px; margin-top:10px; font-weight:bold;"></p>
-  
+        <button class="setup-btn" style="background:#673AB7;" onclick="toggleAnswers()">A kvíz kiértékelése</button>
+        <div id="answers-list" class="hidden" style="text-align:left; background:#fff; border:1px solid #ccc; padding:15px; border-radius:8px; margin-top:10px; font-weight:bold;"></div>
         <button class="setup-btn" onclick="location.reload()">Új játék</button>
     </div>
 </div>
 <script>
-    let correctAnswers=[], currentQuestionIndex=0, correctCount=0, totalTimeSpent=0, timeLeft=60, timerInterval, html5QrCode;
+    let correctAnswers=[], playerAnswers=[], currentQuestionIndex=0, correctCount=0, totalTimeSpent=0, timeLeft=60, timerInterval, html5QrCode;
     const TIME_LIMIT = 60;
+    
     function startCamera() {
         if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
         html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, ()=>{})
@@ -98,21 +98,37 @@
         timerInterval = setInterval(() => {
             timeLeft -= 0.1;
             document.getElementById('timer-progress').style.width = `${(timeLeft / TIME_LIMIT) * 100}%`;
-            if (timeLeft <= 0) { clearInterval(timerInterval); processAnswer(false, TIME_LIMIT); }
+            if (timeLeft <= 0) { clearInterval(timerInterval); playerAnswers.push("IDŐ LEJÁRT"); processAnswer(false, TIME_LIMIT); }
         }, 100);
     }
     function submitAnswer(letter) { 
-        clearInterval(timerInterval); 
-        let spent = parseFloat((TIME_LIMIT - timeLeft).toFixed(1));
-        processAnswer(letter === correctAnswers[currentQuestionIndex], spent); 
+        clearInterval(timerInterval); playerAnswers.push(letter);
+        processAnswer(letter === correctAnswers[currentQuestionIndex], parseFloat((TIME_LIMIT - timeLeft).toFixed(1))); 
     }
     function submitOpenAnswer() {
         let ans = document.getElementById('open-answer-field').value.trim().toUpperCase();
         if(!ans) { alert("Írj be valamit!"); return; }
-        clearInterval(timerInterval);
-        let spent = parseFloat((TIME_LIMIT - timeLeft).toFixed(1));
-        processAnswer(ans === correctAnswers[currentQuestionIndex], spent);
+        clearInterval(timerInterval); playerAnswers.push(ans);
+        processAnswer(checkMatch(ans, correctAnswers[currentQuestionIndex]), parseFloat((TIME_LIMIT - timeLeft).toFixed(1)));
     }
+    
+    function cleanStr(s) {
+        return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "");
+    }
+    function checkMatch(a, b) {
+        let ca = cleanStr(a), cb = cleanStr(b);
+        if (ca === cb) return true;
+        if (cb.length < 4) return false;
+        let dp = Array.from({length:ca.length+1},()=>Array(cb.length+1).fill(0));
+        for(let i=0;i<=ca.length;i++) dp[i][0]=i; for(let j=0;j<=cb.length;j++) dp[0][j]=j;
+        for(let i=1;i<=ca.length;i++){
+            for(let j=1;j<=cb.length;j++){
+                dp[i][j] = ca[i-1]===cb[j-1] ? dp[i-1][j-1] : Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+1);
+            }
+        }
+        return dp[ca.length][cb.length] <= 1;
+    }
+
     function processAnswer(isCorrect, time) {
         totalTimeSpent += time;
         if (isCorrect) { correctCount++; document.getElementById('live-score').innerText = `${correctCount} pont`; }
@@ -126,16 +142,18 @@
         document.getElementById('score-text').innerText = `${correctCount} / ${correctAnswers.length} pont`;
         document.getElementById('total-time-text').innerText = `Idő: ${totalTimeSpent.toFixed(1)} mp`;
         document.getElementById('stats-text').innerText = `Játékos: ${name}\nArány: ${Math.round((correctCount / correctAnswers.length) * 100)}%\nÁtlagidő: ${(totalTimeSpent / correctAnswers.length).toFixed(1)} mp/kérdés`;
-       
- // Előre legyártjuk a megoldásokat tartalmazó listát
-        let listText = correctAnswers.map((ans, idx) => `${idx + 1}. kérdés helyes válasza: ${ans}`).join('\n');
-        document.getElementById('answers-list').innerText = listText;
-    }
-    function toggleAnswers() {
-        let list = document.getElementById('answers-list');
-        list.classList.toggle('hidden');
+        let listContainer = document.getElementById('answers-list'); listContainer.innerHTML = "";
+        correctAnswers.forEach((correct, idx) => {
+            let playerAns = playerAnswers[idx], p = document.createElement('div'), isCorrect = (playerAns===correct || (["A","B","C","D"].includes(correct)?false:checkMatch(playerAns,correct)));
+            if(isCorrect) { p.className="correct-line"; p.innerText=`✔️ ${idx+1}. kérdés: Helyes! Válaszod: "${playerAns}"`;
+ }
+else { p.className="wrong-line";
+ p.innerText=❌ ${idx+1}. kérdés: Hibás! Te: "${playerAns}", Helyes: "${correct}"; 
+}listContainer.appendChild(p);});}
+function toggleAnswers() { document.getElementById('answers-list').classList.toggle('hidden'); }
 
-    }
+
 </script>
 </body>
 </html>
+
