@@ -68,7 +68,7 @@
             let offset = parseInt(rawItems[0], 10);
             
             if (isNaN(offset) || offset < 1 || offset >= rawItems.length) {
-                document.getElementById('qr-status').innerText = "Hibás QR kód formátum (hiányzó vagy rossz eltolási index).";
+                document.getElementById('qr-status').innerText = "Hibás QR kód formátum.";
                 return;
             }
             
@@ -134,7 +134,7 @@
         let listHtml = ""; 
         for(let i=0; i<correctAnswers.length; i++) { 
             let isCorrect = checkMatch(playerAnswers[i], correctAnswers[i]) || playerAnswers[i] === correctAnswers[i]; 
-            listHtml += `<div class="${isCorrect ? 'correct-line' : 'wrong-line'}">${i+1}. Válaszod: ${playerAnswers[i]} | A helyes válasz: ${correctAnswers[i]}</div>`; 
+            listHtml += `<div class="${isCorrect ? 'correct-line' : 'wrong-line'}">${i+1}. Válaszod: ${playerAnswers[i]} |<br> Helyes válasz: ${correctAnswers[i]/}</div>`; 
         } 
         document.getElementById('answers-list').innerHTML = listHtml; 
     }
