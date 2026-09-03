@@ -47,7 +47,7 @@
         <div class="status" id="status-text" style="margin-top:15px; font-weight:bold; color:#555;"></div>
     </div>
     <div id="result-screen" class="hidden">
-        <h2>Szép volt! 🎉</h2>
+        <h2>Az eredményed:</h2>
         <div style="font-size:32px; font-weight:bold; color:#4CAF50; margin:10px 0;" id="score-text">0 pont</div>
         <div style="font-size:18px; font-weight:bold; color:#555; margin-bottom:20px;" id="total-time-text">0.0 mp</div>
         <p id="stats-text" style="white-space:pre-line; text-align:left; background:#eee; padding:15px; border-radius:8px;"></p>
@@ -134,7 +134,7 @@
         let listHtml = ""; 
         for(let i=0; i<correctAnswers.length; i++) { 
             let isCorrect = checkMatch(playerAnswers[i], correctAnswers[i]) || playerAnswers[i] === correctAnswers[i]; 
-            listHtml += `<div class="${isCorrect ? 'correct-line' : 'wrong-line'}">${i+1}. Kérdés: Te: ${playerAnswers[i]} | Helyes: ${correctAnswers[i]}</div>`; 
+            listHtml += `<div class="${isCorrect ? 'correct-line' : 'wrong-line'}">${i+1}. Válaszod: ${playerAnswers[i]} | A helyes válasz: ${correctAnswers[i]}</div>`; 
         } 
         document.getElementById('answers-list').innerHTML = listHtml; 
     }
