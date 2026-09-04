@@ -60,25 +60,32 @@
 <script>
     let correctAnswers=[], playerAnswers=[], currentQuestionIndex=0, correctCount=0, totalTimeSpent=0, timeLeft=60, timerInterval, html5QrCode; const TIME_LIMIT = 60;
     
-function startCamera() { 
-    if (!html5QrCode) html5QrCode = new Html5Qrcode("reader"); 
-    
-    // Konfigurációs objektum kiszervezése a tisztább kódért
-    const config = { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 } 
-    };
+    function startCamera() { 
+        if (!html5QrCode) html5QrCode = new Html5Qrcode("reader"); 
+        
+        const config = { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 } 
+        };
 
-    // A facingMode pontos kényszerítése (exact: "environment")
-    html5QrCode.start(
-        { facingMode: { exact: "environment" } }, 
-        config, 
-        onScanSuccess,
-        (errorMessage) => { /* Opcionális: halk hibák elnyomása szkennelés közben */ }
-    ).catch((err) => {
-        console.error("Kamera indítási hiba:", err);
-                                  
-   
+        html5QrCode.start(
+            { facingMode: { exact: "environment" } }, 
+            config, 
+            onScanSuccess,
+            () => {}
+        ).catch((err) => {
+            console.log("Hátlapi kamera nem elérhető, próbálkozás az alapértelmezettel...", err);
+            html5QrCode.start(
+                { facingMode: "user" }, 
+                config, 
+                onScanSuccess,
+                () => {}
+            ).catch((fallbackErr) => {
+                document.getElementById('qr-status').innerText = "Kamera hiba. HTTPS kapcsolat vagy kamera engedély szükséges!"; 
+            });
+        }); 
+    }
+
     function onScanSuccess(text) { 
         if(text.trim().length > 0) { 
             let rawItems = text.trim().split(',').map(i => i.trim());
@@ -101,8 +108,6 @@ function startCamera() {
         } 
     }
 
-
-
     function checkNameInput() {
         const nameVal = document.getElementById('player-name').value.trim();
         const startBtn = document.getElementById('start-quiz-btn');
@@ -113,9 +118,34 @@ function startCamera() {
         }
     }
     
-    function initQuiz() { if(!document.getElementById('player-name').value.trim()) { alert("Adj meg egy nevet!"); return; } document.getElementById('name-screen').classList.add('hidden'); document.getElementById('quiz-screen').classList.remove('hidden'); startQuestion(); }
+    function initQuiz() { 
+        if(!document.getElementById('player-name').value.trim()) { alert("Adj meg egy nevet!"); return; } 
+        document.getElementById('name-screen').classList.add('hidden'); 
+        document.getElementById('quiz-screen').classList.remove('hidden'); 
+        startQuestion(); 
+    }
     
-    function startQuestion() { timeLeft = TIME_LIMIT; document.getElementById('question-counter').innerText = `${currentQuestionIndex + 1}. Kérdés`; document.getElementById('status-text').innerText = `Kérdések: ${currentQuestionIndex + 1} / ${correctAnswers.length}`; document.getElementById('open-answer-field').value = ""; let cur = correctAnswers[currentQuestionIndex]; let isMC = ["A", "B", "C", "D"].includes(cur); document.getElementById('multiple-choice-ui').classList.toggle('hidden', !isMC); document.getElementById('open-question-ui').classList.toggle('hidden', isMC); if(!isMC) setTimeout(() => document.getElementById('open-answer-field').focus(), 50); clearInterval(timerInterval); timerInterval = setInterval(() => { timeLeft -= 0.1; if (timeLeft < 0) timeLeft = 0; document.getElementById('timer-progress').style.width = `${(timeLeft / TIME_LIMIT) * 100}%`; if (timeLeft <= 0) { clearInterval(timerInterval); submitOpenAnswerTimeout(); } }, 100); }
+    function startQuestion() { 
+        timeLeft = TIME_LIMIT; 
+        document.getElementById('question-counter').innerText = `${currentQuestionIndex + 1}. Kérdés`; 
+        document.getElementById('status-text').innerText = `Kérdések: ${currentQuestionIndex + 1} / ${correctAnswers.length}`; 
+        document.getElementById('open-answer-field').value = ""; 
+        let cur = correctAnswers[currentQuestionIndex]; 
+        let isMC = ["A", "B", "C", "D"].includes(cur); 
+        document.getElementById('multiple-choice-ui').classList.toggle('hidden', !isMC); 
+        document.getElementById('open-question-ui').classList.toggle('hidden', isMC); 
+        if(!isMC) setTimeout(() => document.getElementById('open-answer-field').focus(), 50); 
+        clearInterval(timerInterval); 
+        timerInterval = setInterval(() => { 
+            timeLeft -= 0.1; 
+            if (timeLeft < 0) timeLeft = 0; 
+            document.getElementById('timer-progress').style.width = `${(timeLeft / TIME_LIMIT) * 100}%`; 
+            if (timeLeft <= 0) { 
+                clearInterval(timerInterval); 
+                submitOpenAnswerTimeout(); 
+            } 
+        }, 100); 
+    }
     
     function submitAnswer(letter) { clearInterval(timerInterval); playerAnswers.push(letter); processAnswer(parseFloat((TIME_LIMIT - timeLeft).toFixed(1))); }
     function submitOpenAnswer() { clearInterval(timerInterval); let ans = document.getElementById('open-answer-field').value.trim(); playerAnswers.push(ans || "NINCS VÁLASZ"); processAnswer(parseFloat((TIME_LIMIT - timeLeft).toFixed(1))); }
@@ -151,14 +181,30 @@ function startCamera() {
         let listHtml = ""; 
         for(let i=0; i<correctAnswers.length; i++) { 
             let isCorrect = checkMatch(playerAnswers[i], correctAnswers[i]) || playerAnswers[i] === correctAnswers[i]; 
-            listHtml += `<div class="${isCorrect ? 'correct-line' : 'wrong-line'}">${i+1}. Válaszod: ${playerAnswers[i]} |<br> Helyes válasz: ${correctAnswers[i]/}</div>`; 
+            listHtml += `<div class="${isCorrect ? 'correct-line' : 'wrong-line'}">${i+1}. Válaszod: ${playerAnswers[i]} |<br> Helyes válasz: ${correctAnswers[i]}</div>`; 
         } 
         document.getElementById('answers-list').innerHTML = listHtml; 
     }
     
     function toggleAnswers() { document.getElementById('answers-list').classList.toggle('hidden'); }
     function cleanStr(s) { return s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "") : ""; }
-    function checkMatch(a, b) { let ca = cleanStr(a), cb = cleanStr(b); if (ca === cb) return true; if (cb.length < 4) return false; let dp = Array.from({length:ca.length+1},()=>Array(cb.length+1).fill(0)); for(let i=0;i<=ca.length;i++) dp[i]=i; for(let j=0;j<=cb.length;j++) dp[j]=j; for(let i=1;i<=ca.length;i++) { for(let j=1;j<=cb.length;j++) { dp[i][j] = ca[i-1] === cb[j-1] ? dp[i-1][j-1] : Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) + 1; } } return dp[ca.length][cb.length] <= 1; }
+    
+    function checkMatch(a, b) { 
+        let ca = cleanStr(a), cb = cleanStr(b); 
+        if (ca === cb) return true; 
+        if (cb.length < 4) return false; 
+        
+        let dp = Array.from({length:ca.length+1},()=>Array(cb.length+1).fill(0)); 
+        for(let i=0;i<=ca.length;i++) dp[i][0]=i; 
+        for(let j=0;j<=cb.length;j++) dp[0][j]=j; 
+        
+        for(let i=1;i<=ca.length;i++) { 
+            for(let j=1;j<=cb.length;j++) { 
+                dp[i][j] = ca[i-1] === cb[j-1] ? dp[i-1][j-1] : Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) + 1; 
+            } 
+        } 
+        return dp[ca.length][cb.length] <= 1; 
+    }
 </script>
 </body>
 </html>
