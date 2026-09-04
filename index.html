@@ -60,18 +60,24 @@
 <script>
     let correctAnswers=[], playerAnswers=[], currentQuestionIndex=0, correctCount=0, totalTimeSpent=0, timeLeft=60, timerInterval, html5QrCode; const TIME_LIMIT = 60;
     
-    function startCamera() { if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
- html5QrCode.start(
-            { facingMode: "environment" }, 
-            { fps: 10, qrbox: { width: 250, height: 250 } }, 
-            onScanSuccess, 
-            () => {}
-        ).catch((err) => {
-            console.error(err);
-            document.getElementById('qr-status').innerText = "Kamera hiba. HTTPS szükséges, vagy nincs engedélyezve!"; 
-        }); 
-    }
-                            
+function startCamera() { 
+    if (!html5QrCode) html5QrCode = new Html5Qrcode("reader"); 
+    
+    // Konfigurációs objektum kiszervezése a tisztább kódért
+    const config = { 
+        fps: 10, 
+        qrbox: { width: 250, height: 250 } 
+    };
+
+    // A facingMode pontos kényszerítése (exact: "environment")
+    html5QrCode.start(
+        { facingMode: { exact: "environment" } }, 
+        config, 
+        onScanSuccess,
+        (errorMessage) => { /* Opcionális: halk hibák elnyomása szkennelés közben */ }
+    ).catch((err) => {
+        console.error("Kamera indítási hiba:", err);
+                                  
    
     function onScanSuccess(text) { 
         if(text.trim().length > 0) { 
