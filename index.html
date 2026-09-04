@@ -60,8 +60,16 @@
 <script>
     let correctAnswers=[], playerAnswers=[], currentQuestionIndex=0, correctCount=0, totalTimeSpent=0, timeLeft=60, timerInterval, html5QrCode; const TIME_LIMIT = 60;
     
-    function startCamera() { if (!html5QrCode) html5QrCode = new Html5Qrcode("reader"); html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, ()=>{}).catch(() => document.getElementById('qr-status').innerText = "Kamera hiba. HTTPS?"); }
-    
+    function startCamera() { if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+     html5QrCode.start( { facingMode: "environment" }, 
+    { fps: 10, qrbox: { width: 250, height: 250 } }, 
+    onScanSuccess, 
+    () => {}
+).catch((err) => {
+    document.getElementById('qr-status').innerText = "Kamera hiba. HTTPS?";
+});                       
+                            
+   
     function onScanSuccess(text) { 
         if(text.trim().length > 0) { 
             let rawItems = text.trim().split(',').map(i => i.trim());
